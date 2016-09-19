@@ -63,7 +63,11 @@
             android:clickable="true"/>
     </TableRow>
 
-    <TableRow>
+    <TableRow
+
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent">
+
         <Button
             android:id="@+id/room5"
             android:text="Room5"
@@ -121,7 +125,9 @@
             android:clickable="true"/>
     </TableRow>
 
-    <TableRow>
+    <TableRow
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent">>
         <Button
             android:id="@+id/room9"
             android:text="Room9"

@@ -78,9 +78,6 @@ public class MainActivity extends Activity{
     String beginTime,endTime;
     ArrayList<String> data;
 
-
-
-
     public class CalendarList {
         String calendarName;
         String title;
@@ -97,7 +94,6 @@ public class MainActivity extends Activity{
     Drawable newDrawable;
     Map<String, String> calendarResources = new HashMap<String, String>();
     Map<String, String> meetingRoomNames = new HashMap<String, String>();
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -131,9 +127,7 @@ public class MainActivity extends Activity{
                 String OWNER_ACCOUNT = cursorThirdFloor.getString(3);
 
                 calendarResources.put(displayName, OWNER_ACCOUNT);
-
-System.out.println("calendar name = " + displayName + " id = " + id + " ACCOUNT_NAME = " + ACCOUNT_NAME + " OWNER_ACCOUNT = " + OWNER_ACCOUNT);
-
+                System.out.println("calendar name = " + displayName + " id = " + id + " ACCOUNT_NAME = " + ACCOUNT_NAME + " OWNER_ACCOUNT = " + OWNER_ACCOUNT);
                 calendarNames.add(displayName);
             }
             cursorThirdFloor.close();
@@ -141,7 +135,6 @@ System.out.println("calendar name = " + displayName + " id = " + id + " ACCOUNT_
             // To sort with case sensitive uncomment below
 //            Collections.sort(calendarNames, CALENDAR_NAME_ORDER);
         }
-
 
         if (cursorFourthFloor != null) {
             while (cursorFourthFloor.moveToNext()) {
@@ -164,7 +157,6 @@ System.out.println("calendar name = " + displayName + " id = " + id + " ACCOUNT_
 //            Collections.sort(calendarNames, CALENDAR_NAME_ORDER);
         }
 
-
         // drop down adapter
 //        Spinner spinner = (Spinner) findViewById(R.id.spinner);
 
@@ -182,7 +174,6 @@ System.out.println("calendar name = " + displayName + " id = " + id + " ACCOUNT_
                 return v;
             }
 
-
             public View getDropDownView(int position, View convertView, ViewGroup parent) {
                 View v = super.getDropDownView(position, convertView, parent);
 
@@ -196,7 +187,7 @@ System.out.println("calendar name = " + displayName + " id = " + id + " ACCOUNT_
 
         ///////
         int length = calendarNames.size();
-        int count =0;
+        int count = 0;
         TableLayout table = (TableLayout)findViewById(R.id.rooms);
         // for modifying data of Buttons runtime ***
         for( i = 0; i < table.getChildCount() && length != 0; i++) {
@@ -216,12 +207,12 @@ System.out.println("calendar name = " + displayName + " id = " + id + " ACCOUNT_
                     final String roomName = calendarNames.get(count);
                     boolean isProjectorAvailable = false;
 
-//        String shortMeetingRoomName = getShortMeetingRoomName(meetingRoomName);
+//                  String shortMeetingRoomName = getShortMeetingRoomName(meetingRoomName);
                     if (isProjectorAvailable(roomName)) {
                         isProjectorAvailable = true;
                     }
 
-//                    String shortMeetingRoomName = getShortMeetingRoomName(roomName);
+//                  String shortMeetingRoomName = getShortMeetingRoomName(roomName);
 
                     String size = giveMeetingRoomSize(roomName);
                     button.setText(roomName + "\n");
@@ -236,7 +227,7 @@ System.out.println("calendar name = " + displayName + " id = " + id + " ACCOUNT_
                     boolean isongoing = checkOngoingMeeting(calendarEventList);
                     System.out.println("calendarData=   "+calendarData);
 
-//                    Button button = (Button) findViewById(R.id.room1);
+//                  Button button = (Button) findViewById(R.id.room1);
                     if(isongoing)
                     button.setBackgroundColor(Color.parseColor("#b30000"));
                     else
@@ -246,6 +237,7 @@ System.out.println("calendar name = " + displayName + " id = " + id + " ACCOUNT_
                         public void onClick(View v) {
                             String selectedRoomName = roomName;
                             meetingRoomName = selectedRoomName;
+                            System.out.println("Meetingroomname = "+meetingRoomName);
                             calendarEventList = readCalendar(MainActivity.this,meetingRoomNames.get(meetingRoomName));
                           //  Toast.makeText(getBaseContext(),"****"+meetingRoomName,Toast.LENGTH_SHORT).show();
                             System.out.println("calendarEventList = "+calendarEventList);
@@ -284,7 +276,7 @@ System.out.println("calendar name = " + displayName + " id = " + id + " ACCOUNT_
         int r = count / numberOfColumns;
         int c = count % numberOfColumns;
 
-        for (int h = r; h <=numberOfRows; h++) {
+        for (int h = r; h <= numberOfRows; h++) {
 //        // This is How we remove the table row
             View rowFromWhichCellNeedsToBeDeleted = table.getChildAt(h);
 //		table.removeView(row);
@@ -369,8 +361,6 @@ System.out.println("calendar name = " + displayName + " id = " + id + " ACCOUNT_
         }
 
     // Newly Added end: Newly added Function for highlighting meeting rooms Red/Green
-
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -521,12 +511,6 @@ System.out.println("calendar name = " + displayName + " id = " + id + " ACCOUNT_
             return e1.compareToIgnoreCase(e2);
         }
     };
-
-    /*@Override
-    public void onClick(View v) {
-
-
-    }*/
 
 }
 
