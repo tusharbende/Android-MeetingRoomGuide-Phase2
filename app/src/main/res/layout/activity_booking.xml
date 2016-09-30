@@ -33,7 +33,7 @@
             android:textAlignment="center"
             android:background="@drawable/shape"
             android:inputType="textNoSuggestions"
-            android:fontFamily="DroidSans.ttf"/>
+            android:fontFamily="DroidSans.ttf" />
 
         <TextView
             android:layout_width="400dp"

@@ -22,6 +22,7 @@ import android.os.AsyncTask;
 import android.provider.CalendarContract;
 import android.os.Bundle;
 import android.text.format.DateUtils;
+import android.util.Log;
 import android.util.SparseArray;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -61,6 +62,14 @@ import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.AdapterView;
 import android.widget.Toast;
 
+import com.android.volley.AuthFailureError;
+import com.android.volley.Request;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.VolleyLog;
+import com.android.volley.toolbox.StringRequest;
+
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -74,8 +83,12 @@ public class MainActivity extends Activity{
     String meetingRoomName = "";
     String organizer = "";
     Button button;
-    int i,j;
-    String beginTime,endTime;
+    int i,j,p;
+    private static String TAG = MainActivity.class.getSimpleName();
+    ArrayList<String> buttonText,emp_names,emp1;
+    String displayName,buttonName;
+    String meetingroomID;
+    String beginTime,endTime,URL,first_name,last_name;
     ArrayList<String> data;
 
     public class CalendarList {
@@ -87,7 +100,7 @@ public class MainActivity extends Activity{
     }
 
     View mainRelativeLayout;
-//    CalendarListAdapter calendarListAdapter;
+    //    CalendarListAdapter calendarListAdapter;
     List<CalendarList> calendarEventList;
     List<CalendarList> calendarData;
     private static final String DATE_TIME_FORMAT = "h:mm a";
@@ -102,13 +115,13 @@ public class MainActivity extends Activity{
 
         /********** Display all calendar names in drop down START ****************/
 
-          String[] EVENT_PROJECTION = new String[] {
+        String[] EVENT_PROJECTION = new String[] {
                 CalendarContract.Calendars._ID,                           // 0
                 CalendarContract.Calendars.ACCOUNT_NAME,                  // 1
                 CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,         // 2
                 CalendarContract.Calendars.OWNER_ACCOUNT                  // 3
         };
-
+        buttonText = new ArrayList<>();
         final ArrayList<String> calendarNames = new ArrayList<String>();
         ContentResolver contentResolver = this.getContentResolver();
         Cursor cursorThirdFloor = contentResolver.query(Uri.parse("content://com.android.calendar/calendars"),
@@ -119,8 +132,12 @@ public class MainActivity extends Activity{
         if (cursorThirdFloor != null) {
             while (cursorThirdFloor.moveToNext()) {
                 String displayNameOld = cursorThirdFloor.getString(2);
-                String displayName = displayNameOld.replace("3F", "");// Needs to update this logic for some other pattern
+                displayName = displayNameOld.replace("3F", "");// Needs to update this logic for some other pattern
+                buttonName = displayName;
+                String[] separate = buttonName.split("-");
+                buttonText.add("3F - "+separate[0]);
                 displayName = "3F -" + displayName;
+
                 meetingRoomNames.put(displayName, displayNameOld);
                 String id = cursorThirdFloor.getString(0);
                 String ACCOUNT_NAME = cursorThirdFloor.getString(1);
@@ -129,17 +146,19 @@ public class MainActivity extends Activity{
                 calendarResources.put(displayName, OWNER_ACCOUNT);
                 System.out.println("calendar name = " + displayName + " id = " + id + " ACCOUNT_NAME = " + ACCOUNT_NAME + " OWNER_ACCOUNT = " + OWNER_ACCOUNT);
                 calendarNames.add(displayName);
+
             }
             cursorThirdFloor.close();
 
             // To sort with case sensitive uncomment below
 //            Collections.sort(calendarNames, CALENDAR_NAME_ORDER);
         }
+            System.out.println("buttontext  = "+buttonText);
 
         if (cursorFourthFloor != null) {
             while (cursorFourthFloor.moveToNext()) {
                 String displayNameOld = cursorFourthFloor.getString(2);
-                String displayName = displayNameOld.replace("4F", "");// Needs to update this logic for some other pattern
+                displayName = displayNameOld.replace("4F", "");// Needs to update this logic for some other pattern
                 displayName = "4F -" + displayName;
                 meetingRoomNames.put(displayName, displayNameOld);
                 String id = cursorFourthFloor.getString(0);
@@ -153,10 +172,12 @@ public class MainActivity extends Activity{
             }
             cursorFourthFloor.close();
 
+
             // To sort with case sensitive uncomment below
 //            Collections.sort(calendarNames, CALENDAR_NAME_ORDER);
         }
 
+        System.out.println("****************************"+displayName);
         // drop down adapter
 //        Spinner spinner = (Spinner) findViewById(R.id.spinner);
 
@@ -186,7 +207,7 @@ public class MainActivity extends Activity{
         };
 
         ///////
-        int length = calendarNames.size();
+        int length = buttonText.size();
         int count = 0;
         TableLayout table = (TableLayout)findViewById(R.id.rooms);
         // for modifying data of Buttons runtime ***
@@ -198,13 +219,16 @@ public class MainActivity extends Activity{
                 final TableRow tableRow = (TableRow) row;
                 for( j = 0; j < tableRow.getChildCount() && length != 0; j++) {
                     final View view1 = tableRow.getChildAt(j);
-                     button = (Button) view1;
+                    button = (Button) view1;
+                    button.setTextSize(20);
 
                     // Set original Meeting Room Name in Button text //Commenting for time being
                     // button.setText(calendarNames.get(count));
 
 
                     final String roomName = calendarNames.get(count);
+                    System.out.println("roomname"+roomName);
+
                     boolean isProjectorAvailable = false;
 
 //                  String shortMeetingRoomName = getShortMeetingRoomName(meetingRoomName);
@@ -215,13 +239,14 @@ public class MainActivity extends Activity{
 //                  String shortMeetingRoomName = getShortMeetingRoomName(roomName);
 
                     String size = giveMeetingRoomSize(roomName);
-                    button.setText(roomName + "\n");
+                    String name = buttonText.get(count);
+                    button.setText(name + "\n");
+
                     if (!size.isEmpty())
                         button.setText(button.getText() + "(" + size + ")");
 
                     if (isProjectorAvailable)
                         button.setText(button.getText() + "      (Projector)");
-
 
                     calendarEventList = getDataForListView(MainActivity.this, meetingRoomNames.get(calendarNames.get(count)).toString());
                     boolean isongoing = checkOngoingMeeting(calendarEventList);
@@ -229,17 +254,18 @@ public class MainActivity extends Activity{
 
 //                  Button button = (Button) findViewById(R.id.room1);
                     if(isongoing)
-                    button.setBackgroundColor(Color.parseColor("#b30000"));
+                        button.setBackgroundColor(Color.parseColor("#b30000"));
                     else
-                    button.setBackgroundColor(Color.parseColor("#80ff80"));
+                        button.setBackgroundColor(Color.parseColor("#80ff80"));
                     button.setOnClickListener(new View.OnClickListener() {
                         @Override
                         public void onClick(View v) {
                             String selectedRoomName = roomName;
                             meetingRoomName = selectedRoomName;
+                            meetingroomID = calendarResources.get(meetingRoomName.toString());
                             System.out.println("Meetingroomname = "+meetingRoomName);
                             calendarEventList = readCalendar(MainActivity.this,meetingRoomNames.get(meetingRoomName));
-                          //  Toast.makeText(getBaseContext(),"****"+meetingRoomName,Toast.LENGTH_SHORT).show();
+                            //  Toast.makeText(getBaseContext(),"****"+meetingRoomName,Toast.LENGTH_SHORT).show();
                             System.out.println("calendarEventList = "+calendarEventList);
                             data = new ArrayList<>();
                             for (i = 0; i < calendarData.size(); i++){
@@ -255,10 +281,11 @@ public class MainActivity extends Activity{
 
                             }
 
-                            System.out.println("*******"+data);
+                        //    System.out.println("*******"+data);
                             Intent schedule = new Intent(getBaseContext(), ScheduleActivity.class);
                             schedule.putExtra("message",data);
                             schedule.putExtra("roomName",meetingRoomName);
+                            schedule.putExtra(Intent.EXTRA_EMAIL,meetingroomID);
                             startActivity(schedule);
 
                         }
@@ -289,6 +316,7 @@ public class MainActivity extends Activity{
                 }
             }
         }
+
     }
 
     public boolean isProjectorAvailable(String meetingRoomName) {
@@ -311,64 +339,64 @@ public class MainActivity extends Activity{
 
     // Newly Added Start: Newly added Function for highlighting meeting rooms Red/Green
 
-        public boolean checkOngoingMeeting(List<CalendarList> calendarEventList) {
+    public boolean checkOngoingMeeting(List<CalendarList> calendarEventList) {
 
 
-            if (calendarEventList.size() == 0)
-            {
-                return false;
-            }
-                CalendarList chapter = calendarEventList.get(0);
-
-
-            Calendar calInstanceCurrent = Calendar.getInstance(); // creates calendar
-            calInstanceCurrent.setTime(new Date(new Date().getTime())); // sets calendar time/date
-
-            Calendar calInstanceMeetingEventStart = Calendar.getInstance();
-            calInstanceMeetingEventStart.setTime(new Date(chapter.start.getTime()));
-
-            Calendar calInstanceMeetingEventEnd = Calendar.getInstance();
-            calInstanceMeetingEventEnd.setTime(new Date(chapter.end.getTime()));
-
-            if (!DateUtils.isToday(calInstanceMeetingEventStart.getTimeInMillis())) {
-                calInstanceMeetingEventStart.set(calInstanceCurrent.get(Calendar.YEAR), calInstanceCurrent.get(Calendar.MONTH), calInstanceCurrent.get(Calendar.DAY_OF_MONTH));
-                calInstanceMeetingEventEnd.set(calInstanceCurrent.get(Calendar.YEAR), calInstanceCurrent.get(Calendar.MONTH), calInstanceCurrent.get(Calendar.DAY_OF_MONTH));
-            }
-            long meetingStartTimeConvertedToTodayInMillis = calInstanceMeetingEventStart.getTimeInMillis();
-            long meetingEndTimeConvertedToTodayInMillis = calInstanceMeetingEventEnd.getTimeInMillis();
-
-            // Set current meeting attributes (bg colour etc).
-            // As It is a Current Ongoing meeting Enable the Complaint Button.
-            if (meetingStartTimeConvertedToTodayInMillis < calInstanceCurrent.getTimeInMillis() && meetingEndTimeConvertedToTodayInMillis > calInstanceCurrent.getTimeInMillis()) {
-
-                return true;
-
-            }
-
-            long compare = Integer.valueOf(calInstanceMeetingEventStart.get(Calendar.HOUR_OF_DAY)).compareTo(calInstanceCurrent.get(Calendar.HOUR_OF_DAY));
-
-            if (compare == 0)//Means Both meeting time in hours is same hence compare minutes
-            {
-                compare = Integer.valueOf(calInstanceMeetingEventStart.get(Calendar.MINUTE)).compareTo(calInstanceCurrent.get(Calendar.MINUTE));
-            }
-
-            if ((compare == 1 && currentEventFoundFlag == false) || (currentEventFoundFlag == true && previousTitle == chapter.title))// no meeting event is highlighted
-            {
-
-            }
-
+        if (calendarEventList.size() == 0)
+        {
             return false;
         }
+        CalendarList chapter = calendarEventList.get(0);
+
+
+        Calendar calInstanceCurrent = Calendar.getInstance(); // creates calendar
+        calInstanceCurrent.setTime(new Date(new Date().getTime())); // sets calendar time/date
+
+        Calendar calInstanceMeetingEventStart = Calendar.getInstance();
+        calInstanceMeetingEventStart.setTime(new Date(chapter.start.getTime()));
+
+        Calendar calInstanceMeetingEventEnd = Calendar.getInstance();
+        calInstanceMeetingEventEnd.setTime(new Date(chapter.end.getTime()));
+
+        if (!DateUtils.isToday(calInstanceMeetingEventStart.getTimeInMillis())) {
+            calInstanceMeetingEventStart.set(calInstanceCurrent.get(Calendar.YEAR), calInstanceCurrent.get(Calendar.MONTH), calInstanceCurrent.get(Calendar.DAY_OF_MONTH));
+            calInstanceMeetingEventEnd.set(calInstanceCurrent.get(Calendar.YEAR), calInstanceCurrent.get(Calendar.MONTH), calInstanceCurrent.get(Calendar.DAY_OF_MONTH));
+        }
+        long meetingStartTimeConvertedToTodayInMillis = calInstanceMeetingEventStart.getTimeInMillis();
+        long meetingEndTimeConvertedToTodayInMillis = calInstanceMeetingEventEnd.getTimeInMillis();
+
+        // Set current meeting attributes (bg colour etc).
+        // As It is a Current Ongoing meeting Enable the Complaint Button.
+        if (meetingStartTimeConvertedToTodayInMillis < calInstanceCurrent.getTimeInMillis() && meetingEndTimeConvertedToTodayInMillis > calInstanceCurrent.getTimeInMillis()) {
+
+            return true;
+
+        }
+
+        long compare = Integer.valueOf(calInstanceMeetingEventStart.get(Calendar.HOUR_OF_DAY)).compareTo(calInstanceCurrent.get(Calendar.HOUR_OF_DAY));
+
+        if (compare == 0)//Means Both meeting time in hours is same hence compare minutes
+        {
+            compare = Integer.valueOf(calInstanceMeetingEventStart.get(Calendar.MINUTE)).compareTo(calInstanceCurrent.get(Calendar.MINUTE));
+        }
+
+        if ((compare == 1 && currentEventFoundFlag == false) || (currentEventFoundFlag == true && previousTitle == chapter.title))// no meeting event is highlighted
+        {
+
+        }
+
+        return false;
+    }
 
     // Newly Added end: Newly added Function for highlighting meeting rooms Red/Green
 
-    @Override
+    /*@Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.list_view_with_simple_adapter, menu);
         return true;
     }
-
+*/
     public List<CalendarList> getDataForListView(MainActivity context, String calendarName) {
         List calendarList = readCalendar(context, calendarName);
         return calendarList;
@@ -427,7 +455,7 @@ public class MainActivity extends Activity{
 
 //                if(organizer.isEmpty())
 //                {
-                    organizer = eventCursor.getString(6);
+                organizer = eventCursor.getString(6);
 //                }
 
                 if (duration != null) {
@@ -513,6 +541,5 @@ public class MainActivity extends Activity{
     };
 
 }
-
 
 

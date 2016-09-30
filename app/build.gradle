@@ -22,13 +22,10 @@ android {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    /*compile 'com.google.android.apps.muzei:muzei-api:+'
-    compile files('src/main/java/muzei-api-2.0.jar')*/
-    compile 'com.squareup.retrofit:retrofit:1.8.0'
-   /* compile files('src/main/java/eventbus-2.4.0.jar')*/
     testCompile 'junit:junit:4.12'
     compile 'com.android.support:appcompat-v7:24.1.1'
     compile 'com.google.android.gms:play-services-auth:9.0.2'
+    compile 'com.mcxiaoke.volley:library-aar:1.0.0'
     compile 'pub.devrel:easypermissions:0.1.5'
     compile('com.google.api-client:google-api-client-android:1.22.0') {
         exclude group: 'org.apache.httpcomponents'
