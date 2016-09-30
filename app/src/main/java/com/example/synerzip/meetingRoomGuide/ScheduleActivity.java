@@ -1,48 +1,74 @@
 package com.example.synerzip.meetingRoomGuide;
 
+/**
+ * Created by synerzip on 26/8/16.
+ */
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
-import android.util.TypedValue;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 
+import com.android.volley.AuthFailureError;
+import com.android.volley.Request;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.VolleyLog;
+import com.android.volley.toolbox.StringRequest;
+import com.example.synerzip.meetingRoomGuide.MainActivity;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by synerzip on 11/8/16.
  */
 public class ScheduleActivity extends Activity {
 
-    int i = 1,j =0,k = 0;
+    int i = 1,j =0,k = 0,count,p;
     ArrayList<String> list;
+    private static String TAG = MainActivity.class.getSimpleName();
     int index,index1,index2,pastIndex;
     ArrayList<String> list1;
     ArrayList<String> timeSlots = new ArrayList<String>(Arrays.asList("10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM"
             ,"3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM","7:30 PM","8:00 PM",
-            "8:30 PM","9:00 PM","9:30 PM"));
+            "8:30 PM","9:00 PM","9:30 PM","10:00 PM"));
     TableRow tr;
     Object tag;
     Date startDate,endDate;
     TextView room;
+    String URL;
+    String meetingRoomID,first_name,last_name;
     String roomName;
     TextView tv;
+    TableLayout tl;
     TextView tv1;
     private static final String DATE_TIME_FORMAT = "h:mm a";
     SimpleDateFormat format = new SimpleDateFormat("h:mm a");
     ArrayList<MyClass> MeetingData = new ArrayList<MyClass>();
     TableLayout table;
+    ArrayList<String> emp_names = new ArrayList<>();
     Date date = new Date();
-   // String currentTime = new SimpleDateFormat(DATE_TIME_FORMAT).format(date);
+
+
+
+    // String currentTime = new SimpleDateFormat(DATE_TIME_FORMAT).format(date);
 
 
     public class MyClass {
@@ -63,6 +89,8 @@ public class ScheduleActivity extends Activity {
         list = getData.getStringArrayListExtra("message");
         System.out.println("message"+list);
         roomName = getData.getStringExtra("roomName");
+        emp_names = getData.getStringArrayListExtra("empnames");
+        meetingRoomID = getData.getStringExtra(Intent.EXTRA_EMAIL);
         Typeface externalFont = Typeface.createFromAsset(getAssets(), "DroidSans.ttf");
         list1 = new ArrayList<String>(24);
         room.setText(roomName);
@@ -72,14 +100,14 @@ public class ScheduleActivity extends Activity {
         calendar.setTime(date);
         int unroundedMinutes = calendar.get(Calendar.MINUTE);
         int mod = unroundedMinutes % 30;
-        calendar.add(Calendar.MINUTE, mod < 16 ? -mod : (30-mod));
+        calendar.add(Calendar.MINUTE, mod < 8 ? -mod : -mod);
         System.out.println("calendar"+calendar.getTime());
         String currentTime = new SimpleDateFormat(DATE_TIME_FORMAT).format(calendar.getTime());
         System.out.println("current time string"+currentTime);
 
 
         try {
-            for (i = 1; i <= 25; i++) {
+            for (i = 1; i <= 26; i++) {
 
                 if(i > (list.size()/3)){
 
@@ -114,11 +142,11 @@ public class ScheduleActivity extends Activity {
         TableRow.LayoutParams rowLayout = new TableRow.LayoutParams(TableRow.LayoutParams.MATCH_PARENT, TableRow.LayoutParams.MATCH_PARENT);
         rowLayout.setMargins(1,1,2,1);
 
+
         for (i = 0; i < timeSlots.size(); i++) {
 
             try {
                 tr = new TableRow(this);
-
                 tr.setLayoutParams(new TableRow.LayoutParams(TableRow.LayoutParams.MATCH_PARENT, TableRow.LayoutParams.MATCH_PARENT));
                 tr.setLayoutParams(tableLayout);
                 tr.setMinimumHeight(150);
@@ -163,9 +191,9 @@ public class ScheduleActivity extends Activity {
                         if(timeSlots.get(j).equals(MeetingData.get(i).endTime)){
 
                             index1 = j;
-                            for(k = index +1; k < index1; k++){
+                            for(k = index; k < index1; k++){
 
-                                list1.set(index + 1,MeetingData.get(index2).title);
+                                list1.set(k,MeetingData.get(index2).title);
                             }
                         }
                     }
@@ -174,7 +202,13 @@ public class ScheduleActivity extends Activity {
 
                     tv1.setBackgroundColor(Color.parseColor("#b30000"));
                     tv.setBackgroundColor(Color.parseColor("#b30000"));
+
+                    if(list1.get(i).equals(list1.get(i+1))){
+
+
+                    }
                 }
+
                 else {
 
                     tr.setOnClickListener(new View.OnClickListener() {
@@ -182,9 +216,16 @@ public class ScheduleActivity extends Activity {
                         public void onClick(View v) {
                             index = v.getId();
                             System.out.println("***"+timeSlots.get(index));
-                            Intent goToBooking = new Intent(getBaseContext(),BookingActivity.class);
+                            final Intent goToBooking = new Intent(getBaseContext(),BookingActivity.class);
                             goToBooking.putExtra("timeSlot",timeSlots.get(index));
                             goToBooking.putExtra("roomName",roomName);
+                            goToBooking.putStringArrayListExtra("events",list1);
+                            goToBooking.putExtra(Intent.EXTRA_EMAIL,meetingRoomID);
+
+
+
+
+
                             startActivity(goToBooking);
                         }
                     });
@@ -192,10 +233,13 @@ public class ScheduleActivity extends Activity {
 
                 tv1.setText(list1.get(i));
                 tr.addView(tv1);
-
-
+              //  System.out.println();
             }
             catch (ArrayIndexOutOfBoundsException e){
+                System.out.println("Error"+e);
+
+            }catch (NullPointerException e){
+
                 System.out.println("Error"+e);
 
             }
@@ -205,11 +249,59 @@ public class ScheduleActivity extends Activity {
         for(i = 0; i < pastIndex; i++){
 
             table.removeViewAt(0);
-
-
         }
 
+         for (int z = 0; z < table.getChildCount(); z++) {
+            View view = table.getChildAt(z);
+            if (view instanceof TableRow) {
+                int countForRowsWithSameMeeting=1;
+                TableRow row = (TableRow) view;
+                TextView cell2HavingMeetingName = (TextView) row.getChildAt(1);
+                String textContentOfCell = cell2HavingMeetingName.getText().toString();
+                if("Available - Click to book" == textContentOfCell){
+                    continue;
+                }
+
+                for (int x = z+1; x < table.getChildCount(); x++) {
+                    View view1 = table.getChildAt(x);
+                    TableRow rowInner = (TableRow) view1;
+                    TextView cell2Inner = (TextView) rowInner.getChildAt(1);
+                    String textContentOfCellInner = cell2Inner.getText().toString();
+                    if(textContentOfCell==textContentOfCellInner){
+                        // means meeting is same
+                        countForRowsWithSameMeeting++;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
 
 
+                if(countForRowsWithSameMeeting>1){
+                    //deletion logic
+                    for( int h=1;h<countForRowsWithSameMeeting;h++) {
+                        View viewR = table.getChildAt(z + 1);
+                        if (viewR instanceof TableRow) {
+                            TableRow rowR = (TableRow) viewR;
+                            table.removeView(rowR);
+                        }
+                    }
+
+                    // increase height of row logic
+                    int initialRowHeight;
+                    View viewRowHeight = table.getChildAt(z);
+                    if (viewRowHeight instanceof TableRow) {
+                        initialRowHeight = viewRowHeight.getMinimumHeight();
+                        viewRowHeight.setMinimumHeight(initialRowHeight*countForRowsWithSameMeeting);
+                    }
+
+                }
+               // z=z+countForRowsWithSameMeeting-1;
+
+            }
+
+        }
     }
 }
+

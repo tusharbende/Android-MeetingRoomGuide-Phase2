@@ -23,7 +23,8 @@
             android:id="@+id/table"
             android:layout_margin="50dp"
             android:padding="5dp"
-            android:layout_gravity="center">
+            android:layout_gravity="center"
+           >
 
         </TableLayout>
     </LinearLayout>

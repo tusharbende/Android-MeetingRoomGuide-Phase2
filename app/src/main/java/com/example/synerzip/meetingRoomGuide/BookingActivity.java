@@ -1,21 +1,36 @@
 package com.example.synerzip.meetingRoomGuide;
 
+/**
+ * Created by synerzip on 26/8/16.
+ */
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.android.volley.AuthFailureError;
+import com.android.volley.Request;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.VolleyLog;
+import com.android.volley.toolbox.StringRequest;
 import com.google.api.client.extensions.android.http.AndroidHttp;
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException;
@@ -29,6 +44,10 @@ import com.google.api.services.calendar.model.EventAttendee;
 import com.google.api.services.calendar.model.EventDateTime;
 import com.google.api.services.calendar.model.EventReminder;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -36,6 +55,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by synerzip on 11/8/16.
@@ -47,22 +68,44 @@ public class BookingActivity extends Activity {
     Button button;
     String accountName = "developer@synerzip.com";
     private int REQUEST_AUTHORIZATION = 11;
-    SimpleDateFormat format = new SimpleDateFormat("h:mm a");
+    SimpleDateFormat format = new SimpleDateFormat("hh:mm a");
+    SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
     Button cancel,book;
-    String timeSlot;
+    String timeSlot,URL,last_name,first_name;
     Date selectedTime;
+    ArrayList<String> emp_names;
     AutoCompleteTextView empNames;
     TextView QuickBook;
-    String roomName;
+    int p = 0 ;
+    String roomName,response;
     RadioGroup durationGroup;
-    RadioButton duration;
+    Calendar calendar = Calendar.getInstance();
+    RadioButton duration1,duration2,duration3;
+    Date date  = new Date();
+    Date date1,startTime,endTime;
+    String meetingRoomID,temp;
+    EventAttendee[] attendees;
+    String calendarId = "primary";
+    Event event;
+    Date d1,d2,d3;
+    String d11,d12,d13;
+    ArrayList<String> eventList,UATimeslots;
+    private static String TAG = MainActivity.class.getSimpleName();
+    //ArrayList<Date> ;
+    private static final String DATE_TIME_FORMAT = "h:mm a";
+
+    int i = 0,j = 0;
 
 
-    String empNamesList[]= { "Tushar Bende","Vishakha Korade","Sachin Ghare","Nikhil Waykole","Sushil Shinde","Sujith Sudhakaran","Sneha Jagdale ",
+    ArrayList<String> timeSlots = new ArrayList<String>(Arrays.asList("10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM"
+            ,"3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM","7:30 PM","8:00 PM",
+            "8:30 PM","9:00 PM","9:30 PM","10:00 PM"));
+
+    /*String empNamesList[]= { "Salil Khedkar","Tushar Bende","Vishakha Korade","Sachin Ghare","Nikhil Waykole","Sushil Shinde","Sujith Sudhakaran","Sneha Jagdale ",
             "Himanshu Phirke","Zubair Pathan","Tanvi Shah","Medha Gokhale","Kiran Bodakhe","Nagmani Prasad ","Avnish Kumar","Sandip Nirmal ","Shaila Pawar ",
             "Abhishek Bhattacharyya","Atul Moglewar","Sidharam Teli","Fameeda Tamboli","Dheeraj Koshti","Amit Joshi","Prasanna Barate","Amol Wagh",
             "Yogesh Mandhare","Kunjan Thakkar","Umesh Kadam","Upasana kumari","Sachin Avhad","Yuvraj Patel","Hussain Pithawala"
-    };
+    };*/
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,15 +119,78 @@ public class BookingActivity extends Activity {
         durationGroup = (RadioGroup) findViewById(R.id.durationGroup);
         cancel = (Button) findViewById(R.id.cancelButton);
         book = (Button) findViewById(R.id.bookButton);
+        duration1 = (RadioButton) findViewById(R.id.duration1);
+        duration2 = (RadioButton) findViewById(R.id.duration2);
+        duration3 = (RadioButton) findViewById(R.id.duration3);
         empNames = (AutoCompleteTextView) findViewById(R.id.autoCompleteTextView);
-        /* InputMethodManager imm=(InputMethodManager)getSystemService(BookingActivity.this.INPUT_METHOD_SERVICE);
-        imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);*/
+        eventList = new ArrayList<>();
+        UATimeslots = new ArrayList<>();
+        emp_names = new ArrayList<>();
 
         Intent getData = getIntent();
         timeSlot = getData.getStringExtra("timeSlot");
         roomName = getData.getStringExtra("roomName");
+        meetingRoomID = getData.getStringExtra(Intent.EXTRA_EMAIL);
+        eventList = getData.getStringArrayListExtra("events");
+        System.out.println("eventList = "+eventList);
+        URL = "http://staging.hrms.synerzip.in/symfony/web/index.php/api/directory";
 
-        System.out.println("***"+timeSlot+"roomname ="+roomName);
+        StringRequest sr = new StringRequest(Request.Method.GET, URL, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String response) {
+                Log.d(TAG, response);
+
+                try {
+
+                    JSONArray arr = new JSONArray(response);
+                    System.out.println("dgihcdbcjb"+arr.length());
+                    for(p = 0; p < arr.length(); p++){
+
+                        JSONObject emp_obj = arr.getJSONObject(p);
+                        first_name = emp_obj.getString("emp_firstname");
+                        System.out.println("first"+first_name);
+                        last_name = emp_obj.getString("emp_lastname");
+                        System.out.println("last"+last_name);
+                        emp_names.add(first_name+" "+last_name);
+                    }
+                    System.out.println("emp_names"+emp_names);
+                    Toast.makeText(getBaseContext(),"Done",Toast.LENGTH_SHORT).show();
+                    ArrayAdapter<String> adapter = new ArrayAdapter<String>(getBaseContext(),android.R.layout.simple_list_item_1,emp_names);
+                    empNames.setAdapter(adapter);
+                    empNames.setThreshold(1);
+
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+
+            }
+        }, new Response.ErrorListener() {
+
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                VolleyLog.d(TAG, "Error: " + error.getMessage());
+                Log.d(TAG, ""+error.getMessage()+","+error.toString());
+            }
+        }){
+            @Override
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                Map<String,String> headers = new HashMap<String, String>();
+                headers.put("api-key","acde41a657ea5410c0a2d3c280010060");
+                headers.put("Content-Type", "application/json");
+                return headers;
+            }
+           /* *//**//*@Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String, String> params = new HashMap<String, String>();
+                params.get("emp_firstname");
+                return params;
+            }*//**//**/
+        };
+
+        AppController.getInstance(getBaseContext()).addToRequestQueue(sr);
+
+
 
         try {
 
@@ -94,14 +200,62 @@ public class BookingActivity extends Activity {
 
             e.printStackTrace();
         }
-      /*  Calendar calendar = Calendar.getInstance();
-        calendar.setTime(selectedTime);
-        calendar.add(Calendar.MINUTE,30);
-        System.out.println("addition = "+calendar.getTime());*/
+        date1 = new Date(date.getYear(),date.getMonth(),date.getDate(),selectedTime.getHours(),selectedTime.getMinutes());
+       // calendar.set(Calendar.DATE,date.setTime(selectedTime));
+        calendar.setTime(date1);
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(getBaseContext(),android.R.layout.simple_list_item_1,empNamesList);
-        empNames.setAdapter(adapter);
-        empNames.setThreshold(1);
+        System.out.println("addition = "+calendar.getTime());
+        startTime = calendar.getTime();
+        for(i = 0; i < eventList.size(); i++){
+
+            if(!eventList.get(i).equals("Available - Click to book")) {
+                try {
+                    Date temp1 = format.parse(timeSlots.get(i+1));
+
+                    temp = new SimpleDateFormat(DATE_TIME_FORMAT).format(temp1);
+                    UATimeslots.add(temp);
+                } catch (ParseException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        System.out.println("UATimesslotes "+UATimeslots);
+
+        for(j = 0; j < UATimeslots.size(); j++){
+            calendar.add(Calendar.MINUTE,30);
+            d1 = calendar.getTime();
+            d11 = new SimpleDateFormat(DATE_TIME_FORMAT).format(d1);
+            calendar.add(Calendar.MINUTE,-30);
+            calendar.add(Calendar.HOUR,1);
+            d2 = calendar.getTime();
+            d12 = new SimpleDateFormat(DATE_TIME_FORMAT).format(d2);
+            calendar.add(Calendar.HOUR,-1);
+            calendar.add(Calendar.MINUTE,30);
+            calendar.add(Calendar.HOUR,1);
+            d3 = calendar.getTime();
+            d13 = new SimpleDateFormat(DATE_TIME_FORMAT).format(d3);
+            calendar.add(Calendar.HOUR,-1);
+            calendar.add(Calendar.MINUTE,-30);
+
+
+          /*  if(d11.equals(UATimeslots.get(j))){
+
+                 duration1.setEnabled(false);
+
+            }*/
+            if(d12.equals(UATimeslots.get(j))){
+
+                duration2.setEnabled(false);
+                duration3.setEnabled(false);
+
+            }
+            else if (d13.equals(UATimeslots.get(j))){
+
+                duration3.setEnabled(false);
+            }
+        }
+
+
 
 
         cancel.setOnClickListener(new View.OnClickListener() {
@@ -115,8 +269,56 @@ public class BookingActivity extends Activity {
             @Override
             public void onClick(View v) {
 
+                int selectedID = durationGroup.getCheckedRadioButtonId();
+                if(selectedID == duration1.getId()){
+
+                    calendar.add(Calendar.MINUTE,30);
+                    endTime = calendar.getTime();
+                }
+                else if (selectedID == duration2.getId()){
+
+                    calendar.add(Calendar.HOUR,1);
+                    endTime = calendar.getTime();
+
+                }
+                else {
+
+                    calendar.add(Calendar.HOUR,1);
+                    calendar.add(Calendar.MINUTE,30);
+                    endTime = calendar.getTime();
+                }
                 AsyncTaskRunner task = new AsyncTaskRunner();
                 task.execute();
+                Toast.makeText(BookingActivity.this, "Meeting is scheduled", Toast.LENGTH_SHORT).show();
+                Intent gotoMain = new Intent(getBaseContext(),MainActivity.class);
+                startActivity(gotoMain);
+
+               /* AlertDialog alertDialog = new AlertDialog.Builder(BookingActivity.this).create();
+                alertDialog.setTitle("Meeting Details :");
+                LinearLayout layout = new LinearLayout(getBaseContext());
+                layout.setOrientation(LinearLayout.VERTICAL);
+                TextView meetingName = new TextView(getBaseContext());
+                meetingName.setTextColor(Color.parseColor("#000000"));
+                meetingName.setText("Meeting Name : "+empNames.getText().toString()+"'s Meeting");
+                layout.addView(meetingName);
+                TextView room = new TextView(getBaseContext());
+                room.setText("Meeting Room : "+roomName);
+                room.setTextColor(Color.parseColor("#000000"));
+                layout.addView(room);
+                TextView time = new TextView(getBaseContext());
+                time.setText("Meeting Time : "+startTime+" - "+endTime);
+                time.setTextColor(Color.parseColor("#000000"));
+                layout.addView(time);
+
+                alertDialog.setView(layout);
+                alertDialog.setButton("OK", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        // Write your code here to execute after dialog closed
+                        Toast.makeText(getApplicationContext(), "You clicked on OK", Toast.LENGTH_SHORT).show();
+                    }
+                });
+
+                alertDialog.show();*/
 
             }
         });
@@ -141,31 +343,34 @@ public class BookingActivity extends Activity {
                 .setApplicationName("R_D_Location Calendar")
                 .build();
 
-        Event event = new Event()
-                .setSummary("Event- MAY 2017")
-                .setLocation("Dhaka")
+        event = new Event()
+                .setSummary(empNames.getText().toString()+"'s Meeting")
+                .setLocation(roomName)
                 .setDescription("New test event 1");
 
-        DateTime startDateTime = new DateTime("2016-09-17T18:10:00+06:00");
+        DateTime startDateTime = new DateTime(startTime);
         EventDateTime start = new EventDateTime()
                 .setDateTime(startDateTime)
-                .setTimeZone("Asia/Dhaka");
+                .setTimeZone("Asia/Kolkata");
         event.setStart(start);
 
-        DateTime endDateTime = new DateTime("2016-09-17T18:40:00+06:00");
+        DateTime endDateTime = new DateTime(endTime);
         EventDateTime end = new EventDateTime()
                 .setDateTime(endDateTime)
-                .setTimeZone("Asia/Dhaka");
+                .setTimeZone("Asia/Kolkata");
         event.setEnd(end);
 
-        String[] recurrence = new String[]{"RRULE:FREQ=DAILY;COUNT=2"};
+        String[] recurrence = new String[]{"RRULE:FREQ=DAILY;COUNT=1"};
         event.setRecurrence(Arrays.asList(recurrence));
 
-        EventAttendee[] attendees = new EventAttendee[]{
-                new EventAttendee().setEmail("kiran.bodakhe@synerzip.com"),
-                // new EventAttendee().setEmail("asdasd@andlk.com"),
+        attendees = new EventAttendee[]{
+               //  new EventAttendee().setEmail("kiran.bodakhe@synerzip.com"),
+                  new EventAttendee().setEmail(meetingRoomID),
+
         };
+
         event.setAttendees(Arrays.asList(attendees));
+
 
         EventReminder[] reminderOverrides = new EventReminder[]{
                 new EventReminder().setMethod("email").setMinutes(24 * 60),
@@ -176,9 +381,8 @@ public class BookingActivity extends Activity {
                 .setOverrides(Arrays.asList(reminderOverrides));
         event.setReminders(reminders);
 
-        String calendarId = "primary";
         try {
-            event = service.events().insert(calendarId, event).execute();
+            event = service.events().insert(calendarId, event).setSendNotifications(true).execute();
         } catch (UserRecoverableAuthIOException e) {
             startActivityForResult(e.getIntent(), REQUEST_AUTHORIZATION);
             return;
@@ -187,7 +391,7 @@ public class BookingActivity extends Activity {
         }
         System.out.printf("Event created: %s\n", event.getHtmlLink());
 
-
+     //   Toast.makeText(getBaseContext(),"Meeting is scheduled",Toast.LENGTH_SHORT).show();
     }
 
     @Override
