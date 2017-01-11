@@ -1,51 +1,35 @@
 package com.example.synerzip.meetingRoomGuide;
 
 import android.app.Activity;
-import android.app.ListActivity;
-import android.app.WallpaperManager;
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.ContentResolver;
 import android.content.ContentUris;
-import android.content.ContentValues;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.database.Cursor;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
-import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Handler;
 import android.provider.CalendarContract;
 import android.os.Bundle;
 import android.text.format.DateUtils;
 import android.util.Log;
-import android.util.SparseArray;
-import android.view.LayoutInflater;
-import android.view.Menu;
 import android.view.ViewGroup;
-import android.widget.BaseAdapter;
 import android.widget.Button;
-import android.widget.ImageButton;
-import android.widget.ListView;
 import android.view.View;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -53,13 +37,9 @@ import java.util.List;
 import java.util.Comparator;
 import java.util.Calendar;
 import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.concurrent.ScheduledExecutorService;
 
-import android.widget.Spinner;
 import android.widget.ArrayAdapter;
-import android.widget.AdapterView.OnItemSelectedListener;
-import android.widget.AdapterView;
 import android.widget.Toast;
 
 import com.android.volley.AuthFailureError;
@@ -68,6 +48,18 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.VolleyLog;
 import com.android.volley.toolbox.StringRequest;
+import com.google.api.client.extensions.android.http.AndroidHttp;
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
+import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException;
+import com.google.api.client.http.HttpTransport;
+import com.google.api.client.json.JsonFactory;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.util.DateTime;
+import com.google.api.services.calendar.CalendarScopes;
+import com.google.api.services.calendar.model.Event;
+import com.google.api.services.calendar.model.EventAttendee;
+import com.google.api.services.calendar.model.EventDateTime;
+import com.google.api.services.calendar.model.EventReminder;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -75,22 +67,29 @@ import org.json.JSONObject;
 
 public class MainActivity extends Activity{
     boolean currentEventFoundFlag = false;
+    GoogleAccountCredential mCredential;
+    private static final String[] SCOPES = {CalendarScopes.CALENDAR};
     String previousTitle = "";
-    String startTimeForReporting = "";
-    String endTimeForReporting = "";
-    String titleForReporting = "";
-    String mailBodyText = "";
+    Runnable refresh;
+    private static String TAG = MainActivity.class.getSimpleName();
+    String emailID = "meeting.room.guide@synerzip.com";
     String meetingRoomName = "";
     String organizer = "";
+    private int REQUEST_AUTHORIZATION = 11;
+    JSONObject emp_obj = new JSONObject();
+    ArrayList<String> res =  new ArrayList<>();
+    Intent schedule;
+    Date currentTime,endDate;
     Button button;
+    String first_name,last_name,URL;
     int i,j,p;
-    private static String TAG = MainActivity.class.getSimpleName();
-    ArrayList<String> buttonText,emp_names,emp1;
-    String displayName,buttonName;
-    String meetingroomID;
-    String beginTime,endTime,URL,first_name,last_name;
-    ArrayList<String> data;
-
+    ArrayList<String> buttonText,data;
+    String displayName,buttonName,meetingroomID,beginTime,endTime,timeStart,timeEnd;
+    Date startdate = new Date();
+    EventAttendee[] attendees;
+    String calendarId = "primary";
+    Event event;
+    ArrayList<String> emp_names = new ArrayList<>();
     public class CalendarList {
         String calendarName;
         String title;
@@ -98,13 +97,9 @@ public class MainActivity extends Activity{
         Date end;
         String organizer;
     }
-
-    View mainRelativeLayout;
-    //    CalendarListAdapter calendarListAdapter;
     List<CalendarList> calendarEventList;
     List<CalendarList> calendarData;
     private static final String DATE_TIME_FORMAT = "h:mm a";
-    Drawable newDrawable;
     Map<String, String> calendarResources = new HashMap<String, String>();
     Map<String, String> meetingRoomNames = new HashMap<String, String>();
 
@@ -112,6 +107,15 @@ public class MainActivity extends Activity{
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        URL = "http://staging.hrms.synerzip.in/symfony/web/index.php/api/directory";
+
+
+        AsyncTaskRunner1 task = new AsyncTaskRunner1();
+        task.execute();
+        Toast.makeText(MainActivity.this, "Done", Toast.LENGTH_SHORT).show();
+        System.out.println("*********************" + res);
+        mCredential = GoogleAccountCredential.usingOAuth2(getBaseContext(), Arrays.asList(SCOPES));
+        mCredential.setSelectedAccountName(emailID);
 
         /********** Display all calendar names in drop down START ****************/
 
@@ -122,12 +126,14 @@ public class MainActivity extends Activity{
                 CalendarContract.Calendars.OWNER_ACCOUNT                  // 3
         };
         buttonText = new ArrayList<>();
+
         final ArrayList<String> calendarNames = new ArrayList<String>();
         ContentResolver contentResolver = this.getContentResolver();
         Cursor cursorThirdFloor = contentResolver.query(Uri.parse("content://com.android.calendar/calendars"),
                 EVENT_PROJECTION, "calendar_displayName LIKE '%3F%'", null, "name ASC");
         Cursor cursorFourthFloor = contentResolver.query(Uri.parse("content://com.android.calendar/calendars"),
                 EVENT_PROJECTION, "calendar_displayName LIKE '%4F%'", null, "name ASC");
+
 
         if (cursorThirdFloor != null) {
             while (cursorThirdFloor.moveToNext()) {
@@ -239,7 +245,7 @@ public class MainActivity extends Activity{
 //                  String shortMeetingRoomName = getShortMeetingRoomName(roomName);
 
                     String size = giveMeetingRoomSize(roomName);
-                    String name = buttonText.get(count);
+                    final String name = buttonText.get(count);
                     button.setText(name + "\n");
 
                     if (!size.isEmpty())
@@ -253,43 +259,87 @@ public class MainActivity extends Activity{
                     System.out.println("calendarData=   "+calendarData);
 
 //                  Button button = (Button) findViewById(R.id.room1);
-                    if(isongoing)
+                    if(isongoing) {
                         button.setBackgroundColor(Color.parseColor("#b30000"));
-                    else
+                    }
+                    else {
                         button.setBackgroundColor(Color.parseColor("#80ff80"));
-                    button.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            String selectedRoomName = roomName;
-                            meetingRoomName = selectedRoomName;
-                            meetingroomID = calendarResources.get(meetingRoomName.toString());
-                            System.out.println("Meetingroomname = "+meetingRoomName);
-                            calendarEventList = readCalendar(MainActivity.this,meetingRoomNames.get(meetingRoomName));
-                            //  Toast.makeText(getBaseContext(),"****"+meetingRoomName,Toast.LENGTH_SHORT).show();
-                            System.out.println("calendarEventList = "+calendarEventList);
-                            data = new ArrayList<>();
-                            for (i = 0; i < calendarData.size(); i++){
+                        button.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+
+                                Calendar calendar = Calendar.getInstance();
+                                calendar.setTime(startdate);
+                                int unroundedMinutes = calendar.get(Calendar.MINUTE);
+                                int mod = unroundedMinutes % 30;
+                                calendar.add(Calendar.MINUTE, mod < 8 ? -mod : -mod);
+                                System.out.println("calendar"+calendar.getTime());
+                                currentTime = calendar.getTime();
+                                //  currentTime = new SimpleDateFormat(DATE_TIME_FORMAT).format(calendar.getTime());
+                                System.out.println("current time string"+currentTime);
+                                calendar.add(Calendar.MINUTE,30);
+                                endDate = calendar.getTime();
+                                String selectedRoomName = roomName;
+                                meetingRoomName = selectedRoomName;
+                                meetingroomID = calendarResources.get(meetingRoomName.toString());
+                                System.out.println("Meetingroomname = "+meetingRoomName);
+                                calendarEventList = readCalendar(MainActivity.this,meetingRoomNames.get(meetingRoomName));
+                                //  Toast.makeText(getBaseContext(),"****"+meetingRoomName,Toast.LENGTH_SHORT).show();
+                                System.out.println("calendarEventList = "+calendarEventList);
+                                data = new ArrayList<>();
+                                for (i = 0; i < calendarData.size(); i++){
 
 
-                                beginTime = new SimpleDateFormat(DATE_TIME_FORMAT).format(calendarData.get(i).start);
-                                System.out.println("begintime = "+beginTime);
-                                endTime = new SimpleDateFormat(DATE_TIME_FORMAT).format(calendarData.get(i).end);
-                                System.out.println("endtime = "+endTime);
-                                data.add(calendarData.get(i).title);
-                                data.add(beginTime);
-                                data.add(endTime);
+                                    beginTime = new SimpleDateFormat(DATE_TIME_FORMAT).format(calendarData.get(i).start);
+                                    System.out.println("begintime = "+beginTime);
+                                    endTime = new SimpleDateFormat(DATE_TIME_FORMAT).format(calendarData.get(i).end);
+                                    System.out.println("endtime = "+endTime);
+                                    data.add(calendarData.get(i).title);
+                                    data.add(beginTime);
+                                    data.add(endTime);
+
+                                }
+
+                                timeStart = new SimpleDateFormat(DATE_TIME_FORMAT).format(currentTime);
+                                timeEnd = new SimpleDateFormat(DATE_TIME_FORMAT).format(endDate);
+                                //    System.out.println("*******"+data);
+
+                                AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this).create(); //Read Update
+                                alertDialog.setTitle("Confirm your booking\n");
+                                alertDialog.setMessage("Book "+name+"from "+timeStart+" to "+timeEnd);
+                                alertDialog.setButton(Dialog.BUTTON_POSITIVE,"Yes", new DialogInterface.OnClickListener() {
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        // Write your code here to execute after dialog closed
+                                        // Toast.makeText(getApplicationContext(), "You clicked on OK", Toast.LENGTH_SHORT).show();
+
+                                        AsyncTaskRunner task = new AsyncTaskRunner();
+                                        task.execute();
+                                        Toast.makeText(MainActivity.this, "Meeting is scheduled", Toast.LENGTH_SHORT).show();
+                                                                       // finish();
+                                    }
+
+                                });
+                                alertDialog.setButton(Dialog.BUTTON_NEGATIVE,"Edit", new DialogInterface.OnClickListener() {
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        // Write your code here to execute after dialog closed
+                                        // Toast.makeText(getApplicationContext(), "You clicked on OK", Toast.LENGTH_SHORT).show();
+                                        schedule = new Intent(getBaseContext(), ScheduleActivity.class);
+                                        schedule.putExtra("message",data);
+                                        schedule.putExtra("json", res);
+                                        System.out.println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"+res);
+                                        schedule.putExtra("roomName",meetingRoomName);
+                                        schedule.putExtra(Intent.EXTRA_EMAIL,meetingroomID);
+                                        startActivity(schedule);
+
+                                    }
+
+                                });
+                                alertDialog.show();
 
                             }
+                        });
 
-                        //    System.out.println("*******"+data);
-                            Intent schedule = new Intent(getBaseContext(), ScheduleActivity.class);
-                            schedule.putExtra("message",data);
-                            schedule.putExtra("roomName",meetingRoomName);
-                            schedule.putExtra(Intent.EXTRA_EMAIL,meetingroomID);
-                            startActivity(schedule);
-
-                        }
-                    });
+                    }
 
                     length--;
                     count++;
@@ -539,7 +589,135 @@ public class MainActivity extends Activity{
             return e1.compareToIgnoreCase(e2);
         }
     };
+    private class AsyncTaskRunner extends AsyncTask<Void, Void, Void> {
 
+        @Override
+        protected Void doInBackground(Void... voids) {
+            createEvent(mCredential);
+
+            return null;
+        }
+    }
+
+    public void createEvent(GoogleAccountCredential mCredential) {
+
+        HttpTransport transport = AndroidHttp.newCompatibleTransport();
+        JsonFactory jsonFactory = JacksonFactory.getDefaultInstance();
+        com.google.api.services.calendar.Calendar service = new com.google.api.services.calendar.Calendar.Builder(
+                transport, jsonFactory, mCredential)
+                .setApplicationName("R_D_Location Calendar")
+                .build();
+
+        event = new Event()
+                .setSummary("Meeting Room Guide created meeting")
+                .setLocation(meetingRoomName)
+                .setDescription("New test event 1");
+
+        DateTime startDateTime = new DateTime(currentTime);
+        EventDateTime start = new EventDateTime()
+                .setDateTime(startDateTime)
+                .setTimeZone("Asia/Kolkata");
+        event.setStart(start);
+
+        DateTime endDateTime = new DateTime(endDate);
+        EventDateTime end = new EventDateTime()
+                .setDateTime(endDateTime)
+                .setTimeZone("Asia/Kolkata");
+        event.setEnd(end);
+
+        String[] recurrence = new String[]{"RRULE:FREQ=DAILY;COUNT=1"};
+        event.setRecurrence(Arrays.asList(recurrence));
+
+        attendees = new EventAttendee[]{
+                //  new EventAttendee().setEmail("kiran.bodakhe@synerzip.com"),
+                new EventAttendee().setEmail(meetingroomID),
+
+        };
+
+        event.setAttendees(Arrays.asList(attendees));
+
+
+        EventReminder[] reminderOverrides = new EventReminder[]{
+                new EventReminder().setMethod("email").setMinutes(24 * 60),
+                new EventReminder().setMethod("popup").setMinutes(10),
+        };
+        Event.Reminders reminders = new Event.Reminders()
+                .setUseDefault(false)
+                .setOverrides(Arrays.asList(reminderOverrides));
+        event.setReminders(reminders);
+
+        try {
+            event = service.events().insert(calendarId, event).setSendNotifications(true).execute();
+        } catch (UserRecoverableAuthIOException e) {
+            startActivityForResult(e.getIntent(), REQUEST_AUTHORIZATION);
+            return;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        System.out.printf("Event created: %s\n", event.getHtmlLink());
+
+        //   Toast.makeText(getBaseContext(),"Meeting is scheduled",Toast.LENGTH_SHORT).show();
+    }
+
+    class AsyncTaskRunner1 extends AsyncTask<String, String, ArrayList<String>> {
+
+        @Override
+        protected ArrayList<String> doInBackground(String... strings) {
+            StringRequest sr = new StringRequest(Request.Method.GET, URL, new Response.Listener<String>() {
+                @Override
+                public void onResponse(String response) {
+                    Log.d(TAG, response);
+
+                    try {
+
+                        JSONArray arr = new JSONArray(response);
+                        // System.out.println("fvkfbkdnlc"+arr);
+                        System.out.println("dgihcdbcjb" + arr.length());
+                        for (p = 0; p < arr.length(); p++) {
+
+                            emp_obj = arr.getJSONObject(p);
+                            first_name = emp_obj.getString("emp_firstname");
+                            last_name = emp_obj.getString("emp_lastname");
+                            emp_names.add(first_name + " " + last_name);
+                        }
+                        res = emp_names;
+                        System.out.println("emp_names" + emp_names);
+                        Toast.makeText(MainActivity.this, "Done", Toast.LENGTH_SHORT).show();
+                       // i = new Intent(getBaseContext(), ScheduleActivity.class);
+
+
+                      //  startActivity(i);
+
+
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+
+
+                }
+            }, new Response.ErrorListener() {
+
+                @Override
+                public void onErrorResponse(VolleyError error) {
+                    VolleyLog.d(TAG, "Error: " + error.getMessage());
+                    Log.d(TAG, "" + error.getMessage() + "," + error.toString());
+                }
+            }) {
+                @Override
+                public Map<String, String> getHeaders() throws AuthFailureError {
+                    Map<String, String> headers = new HashMap<String, String>();
+                    headers.put("api-key", "0a9c00533933b1597c7dcd5169236f1d");
+                    headers.put("Content-Type", "application/json");
+                    return headers;
+                }
+
+            };
+
+            AppController.getInstance(getBaseContext()).addToRequestQueue(sr);
+
+            return res;
+        }
+    }
 }
 
 

@@ -8,68 +8,40 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 
-import com.android.volley.AuthFailureError;
-import com.android.volley.Request;
-import com.android.volley.Response;
-import com.android.volley.VolleyError;
-import com.android.volley.VolleyLog;
-import com.android.volley.toolbox.StringRequest;
-import com.example.synerzip.meetingRoomGuide.MainActivity;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Created by synerzip on 11/8/16.
  */
 public class ScheduleActivity extends Activity {
 
-    int i = 1,j =0,k = 0,count,p;
+    int i = 1,j =0,k = 0;
     ArrayList<String> list;
-    private static String TAG = MainActivity.class.getSimpleName();
     int index,index1,index2,pastIndex;
     ArrayList<String> list1;
     ArrayList<String> timeSlots = new ArrayList<String>(Arrays.asList("10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM"
             ,"3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM","7:30 PM","8:00 PM",
             "8:30 PM","9:00 PM","9:30 PM","10:00 PM"));
     TableRow tr;
-    Object tag;
-    Date startDate,endDate;
     TextView room;
-    String URL;
-    String meetingRoomID,first_name,last_name;
-    String roomName;
-    TextView tv;
-    TableLayout tl;
-    TextView tv1;
+    String meetingRoomID,roomName;
+    TextView tv,tv1;
+    ArrayList<String> res = new ArrayList<>();
     private static final String DATE_TIME_FORMAT = "h:mm a";
-    SimpleDateFormat format = new SimpleDateFormat("h:mm a");
     ArrayList<MyClass> MeetingData = new ArrayList<MyClass>();
     TableLayout table;
     ArrayList<String> emp_names = new ArrayList<>();
     Date date = new Date();
-
-
-
-    // String currentTime = new SimpleDateFormat(DATE_TIME_FORMAT).format(date);
-
 
     public class MyClass {
 
@@ -94,6 +66,8 @@ public class ScheduleActivity extends Activity {
         Typeface externalFont = Typeface.createFromAsset(getAssets(), "DroidSans.ttf");
         list1 = new ArrayList<String>(24);
         room.setText(roomName);
+        res = getData.getStringArrayListExtra("json");
+        System.out.println("#####################################"+res);
         //System.out.println("current time string"+currentTime);
 
         Calendar calendar = Calendar.getInstance();
@@ -104,6 +78,7 @@ public class ScheduleActivity extends Activity {
         System.out.println("calendar"+calendar.getTime());
         String currentTime = new SimpleDateFormat(DATE_TIME_FORMAT).format(calendar.getTime());
         System.out.println("current time string"+currentTime);
+
 
 
         try {
@@ -149,15 +124,14 @@ public class ScheduleActivity extends Activity {
                 tr = new TableRow(this);
                 tr.setLayoutParams(new TableRow.LayoutParams(TableRow.LayoutParams.MATCH_PARENT, TableRow.LayoutParams.MATCH_PARENT));
                 tr.setLayoutParams(tableLayout);
-                tr.setMinimumHeight(150);
+                tr.setMinimumHeight(80);
                 tr.setId(i);
                 table.addView(tr);
-
                 tv = new TextView(this);
                 tv.setText(timeSlots.get(i));
                 tv.setBackgroundColor(Color.parseColor("#b2b2b2"));
-                tv.setMinWidth(400);
-                tv.setMinimumHeight(150);
+                tv.setMinWidth(200);
+                tv.setMinimumHeight(80);
                 tv.setLayoutParams(rowLayout);
                 tv.setTypeface(externalFont);
                 tv.setTextSize(20);
@@ -166,7 +140,7 @@ public class ScheduleActivity extends Activity {
 
                 tv1 = new TextView(this);
                 tv1.setLayoutParams(rowLayout);
-                tv1.setMinWidth(2000);
+                tv1.setMinWidth(730);
                 tv1.setTypeface(externalFont);
                 tv1.setTextSize(20);
                 tv1.setBackgroundColor(Color.parseColor("#80ff80"));
@@ -220,6 +194,7 @@ public class ScheduleActivity extends Activity {
                             goToBooking.putExtra("timeSlot",timeSlots.get(index));
                             goToBooking.putExtra("roomName",roomName);
                             goToBooking.putStringArrayListExtra("events",list1);
+                            goToBooking.putStringArrayListExtra("json",res);
                             goToBooking.putExtra(Intent.EXTRA_EMAIL,meetingRoomID);
 
 
